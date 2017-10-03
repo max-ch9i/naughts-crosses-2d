@@ -9,24 +9,16 @@ enum Cell {
 type Board = Cell[][];
 
 class Leaf {
-    constructor(private board: Board, private children: Leaf[], private level: number) {
-    }
+    constructor(public board: Board = null,
+                public children: Leaf[] = [],
+                public level: number = 0,
+                public winner: Cell = null
+    ) {}
 }
-
-const Game: Leaf = new Leaf([], [], 0);
 
 const invertSign = function(sign: Cell): Cell {
-    return sign === Cell.Cross ? Cell.Naught : Cell.Cross; 
+    return sign === Cell.Cross ? Cell.Naught : Cell.Cross;
 }
-
-const emptyBoard: Board = [
-    // Row 0
-    [Cell.Empty, Cell.Empty, Cell.Empty],
-    // Row 1
-    [Cell.Empty, Cell.Empty, Cell.Empty],
-    // Row 2
-    [Cell.Empty, Cell.Empty, Cell.Empty]
-];
 
 const generateNextMoveBoards = function(current: Board, nextSign: Cell): Board[] {
     const boards: Board[] = [];
@@ -81,12 +73,12 @@ const checkWinner = function(board: Board): Cell {
     for (let column = 0; column < board[0].length; column++) {
         if (winner === null) {
             // Make a column
-            const vertical: Cell[] = []; 
+            const vertical: Cell[] = [];
 
             for (let row in board) {
                 vertical.push(board[row][column]);
             }
-            
+
             const _winner = checkSameInRow(vertical);
             if (_winner !== Cell.Empty) {
                 winner = _winner;
@@ -96,7 +88,7 @@ const checkWinner = function(board: Board): Cell {
 
     // Check diagonals
     if (winner === null) {
-        const diagonalPositive: Cell[] = []; 
+        const diagonalPositive: Cell[] = [];
 
         for (let row = board.length - 1, column = 0; row >= 0; row--,  column++) {
             diagonalPositive.push(board[row][column]);
@@ -109,7 +101,7 @@ const checkWinner = function(board: Board): Cell {
     }
 
     if (winner === null) {
-        const diagonalNegative: Cell[] = []; 
+        const diagonalNegative: Cell[] = [];
 
         for (let row = 0, column = 0; row < board.length; row++,  column++) {
             diagonalNegative.push(board[row][column]);
@@ -124,6 +116,34 @@ const checkWinner = function(board: Board): Cell {
     return winner;
 };
 
-const makeGameTree = function(parent: Leaf, nextSign: Cell): void {
+const makeGameTree = function(parent: Leaf, nextSign: Cell, level: number = 0): void {
+    const currentBoard = parent.board;
+    const nextLevel = level + 1;
+    const winner = checkWinner(currentBoard);
 
+    if (winner !== null) {
+        parent.winner = winner;
+        // Needs no children
+        return;
+    }
+
+    const childBoards = generateNextMoveBoards(currentBoard, nextSign);
+    childBoards.forEach(board => {
+        const child = new Leaf(board, [], nextLevel);
+        parent.children.push(child);
+    });
+    parent.children.forEach(child => makeGameTree(child, invertSign(nextSign), nextLevel));
 };
+
+const emptyBoard: Board = [
+    // Row 0
+    [Cell.Empty, Cell.Empty, Cell.Empty],
+    // Row 1
+    [Cell.Empty, Cell.Empty, Cell.Empty],
+    // Row 2
+    [Cell.Empty, Cell.Empty, Cell.Empty]
+];
+
+const game: Leaf = new Leaf(emptyBoard, [], 0);
+
+makeGameTree(game, Cell.Cross);
