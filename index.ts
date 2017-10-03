@@ -1,5 +1,3 @@
-// Hello world
-
 enum Cell {
     Naught = 1, // Always bot
     Cross,      // Always user
@@ -116,9 +114,9 @@ const checkWinner = function(board: Board): Cell {
     return winner;
 };
 
-const makeGameTree = function(parent: Leaf, nextSign: Cell, level: number = 0): void {
+const makeGameTree = function(parent: Leaf, nextSign: Cell): void {
     const currentBoard = parent.board;
-    const nextLevel = level + 1;
+    const nextLevel = parent.level + 1;
     const winner = checkWinner(currentBoard);
 
     if (winner !== null) {
@@ -132,8 +130,104 @@ const makeGameTree = function(parent: Leaf, nextSign: Cell, level: number = 0): 
         const child = new Leaf(board, [], nextLevel);
         parent.children.push(child);
     });
-    parent.children.forEach(child => makeGameTree(child, invertSign(nextSign), nextLevel));
+    parent.children.forEach(child => makeGameTree(child, invertSign(nextSign)));
 };
+
+const boardsEqual = function(foo: Board, bar: Board): boolean {
+    let equal = true;
+
+    loop1: 
+    for (let row = 0; row < foo.length; row++) {
+        for (let column = 0; column < foo[0].length; column++) {
+            if (foo[row][column] !== bar[row][column]) {
+                equal = false;
+                break loop1;
+            }
+        }
+    }
+
+    return equal;
+};
+
+const findLeafByBoard = function(parent: Leaf, targetBoard: Board): Leaf {
+    let needle: Leaf = null;
+
+    const currentBoard = parent.board;
+    const currentChildren = parent.children;
+
+    if (boardsEqual(currentBoard, targetBoard)) {
+        // Try the top level node
+        needle = parent; 
+    } else {
+        // Try the children
+        for (let child = 0; child < currentChildren.length; child++) {
+            const _find = findLeafByBoard(currentChildren[child], targetBoard);
+
+            if (_find !== null) {
+                needle = _find;
+                break;
+            }
+        }
+    }
+
+    return needle;
+};
+
+interface Stats {
+    [outcome: number]: number,
+};
+
+type BranchStats = [Leaf, Stats];
+
+const computeBranchStats = function(parent: Leaf, acc: Stats): void {
+    let outcome: Cell = null;
+
+    if (parent.children.length === 0) {
+        // Leaf node
+        if (parent.winner !== null) {
+            outcome = parent.winner;
+        } else {
+            // Draw
+            outcome = Cell.Empty;
+        }
+        
+        acc[outcome] += 1;
+    } else {
+        parent.children.forEach(child => computeBranchStats(child, acc));
+    }
+};
+
+const findBestBranch = function(parent: Leaf, winningSign: (Cell.Cross | Cell.Naught)): Leaf {
+    const children = parent.children;
+
+    const branchStats = children.map((child: Leaf): BranchStats => {
+        const stats: Stats = {[Cell.Cross]: 0, [Cell.Naught]: 0, [Cell.Empty]: 0};
+        computeBranchStats(child, stats);
+        return [child, stats];
+    });
+
+    // Compare branch stats
+    const [bestLeaf] = branchStats.reduce((acc, elm) => {
+        if (acc === null) {
+            return elm;
+        }
+
+        const [accChild, accStats] = acc;
+        const [child, stats] = elm;
+        
+        if (stats[winningSign] + stats[Cell.Empty] > accStats[winningSign] + accStats[Cell.Empty]) {
+            return elm;
+        }
+
+        return acc;
+    }, null);
+
+    return bestLeaf;
+};
+
+/**
+ * Execution
+ */
 
 const emptyBoard: Board = [
     // Row 0
@@ -147,3 +241,16 @@ const emptyBoard: Board = [
 const game: Leaf = new Leaf(emptyBoard, [], 0);
 
 makeGameTree(game, Cell.Cross);
+
+const testBoard = [
+    // Row 0
+    [Cell.Empty, Cell.Empty, Cell.Empty],
+    // Row 1
+    [Cell.Empty, Cell.Cross, Cell.Cross],
+    // Row 2
+    [Cell.Empty, Cell.Empty, Cell.Naught]
+];
+
+const move = findLeafByBoard(game, testBoard);
+
+const bestBranch = findBestBranch(move, Cell.Naught);
